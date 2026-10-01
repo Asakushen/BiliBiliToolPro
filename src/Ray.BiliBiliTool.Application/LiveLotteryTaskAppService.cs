@@ -1,78 +1,78 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos;
+using Ray.BiliBiliTool.Agent;
 using Ray.BiliBiliTool.Application.Attributes;
 using Ray.BiliBiliTool.Application.Contracts;
+using Ray.BiliBiliTool.Application.Diagnostics;
 using Ray.BiliBiliTool.Config.Options;
 using Ray.BiliBiliTool.DomainService.Interfaces;
-using Ray.BiliBiliTool.Infrastructure.Enums;
+using Ray.BiliBiliTool.Infrastructure.Cookie;
 
-namespace Ray.BiliBiliTool.Application
+namespace Ray.BiliBiliTool.Application;
+
+public class LiveLotteryTaskAppService(
+    ILiveDomainService liveDomainService,
+    IOptionsMonitor<LiveLotteryTaskOptions> liveLotteryTaskOptions,
+    ILogger<LiveLotteryTaskAppService> logger,
+    IAccountDomainService accountDomainService,
+    ILoginDomainService loginDomainService,
+    IConfiguration configuration,
+    CookieStrFactory<BiliCookie> cookieStrFactory
+)
+    : BaseMultiAccountsAppService(logger, cookieStrFactory, loginDomainService, configuration),
+        ILiveLotteryTaskAppService
 {
-    public class LiveLotteryTaskAppService : AppService, ILiveLotteryTaskAppService
+    private readonly LiveLotteryTaskOptions _liveLotteryTaskOptions =
+        liveLotteryTaskOptions.CurrentValue;
+
+    [TaskInterceptor("天选时刻抽奖", TaskLevel.One)]
+    protected override async Task DoTaskAccountAsync(
+        BiliCookie ck,
+        CancellationToken cancellationToken = default
+    )
     {
-        private readonly ILogger<LiveLotteryTaskAppService> _logger;
-        private readonly IConfiguration _configuration;
-        private readonly ILiveDomainService _liveDomainService;
-        private readonly LiveLotteryTaskOptions _liveLotteryTaskOptions;
-        private readonly SecurityOptions _securityOptions;
-        private readonly IAccountDomainService _accountDomainService;
-
-        public LiveLotteryTaskAppService(
-            IConfiguration configuration,
-            ILiveDomainService liveDomainService,
-            IOptionsMonitor<SecurityOptions> securityOptions,
-            IOptionsMonitor<LiveLotteryTaskOptions> liveLotteryTaskOptions,
-            ILogger<LiveLotteryTaskAppService> logger,
-            IAccountDomainService accountDomainService
-            )
-        {
-            _configuration = configuration;
-            _liveDomainService = liveDomainService;
-            _liveLotteryTaskOptions = liveLotteryTaskOptions.CurrentValue;
-            _securityOptions = securityOptions.CurrentValue;
-            _logger = logger;
-            _accountDomainService = accountDomainService;
-        }
-
-        [TaskInterceptor("天选时刻抽奖", TaskLevel.One)]
-        public override void DoTask()
-        {
-            LogUserInfo();
-            LotteryTianXuan();
-            AutoGroupFollowings();
-        }
-
-        [TaskInterceptor("打印用户信息")]
-        private void LogUserInfo()
-        {
-            _accountDomainService.LoginByCookie();
-        }
-
-        [TaskInterceptor("抽奖")]
-        private void LotteryTianXuan()
-        {
-            _liveDomainService.TianXuan();
-        }
-
-        [TaskInterceptor("自动分组关注的主播")]
-        private void AutoGroupFollowings()
-        {
-            if (_liveLotteryTaskOptions.AutoGroupFollowings)
+        await TaskFlowDiagnosticScope.ExecuteAsync(
+            logger,
+            "天选时刻抽奖",
+            async () =>
             {
-                _liveDomainService.GroupFollowing();
+                if (!liveLotteryTaskOptions.CurrentValue.IsEnable)
+                {
+                    logger.LogInformation("已配置为关闭，跳过");
+                    return;
+                }
+
+                await SetCookiesAsync(ck, cancellationToken);
+                await LogUserInfo(ck);
+                await LotteryTianXuan(ck);
+                await AutoGroupFollowings(ck);
             }
-            else
-            {
-                _logger.LogInformation("配置未开启，跳过");
-            }
+        );
+    }
+
+    [TaskInterceptor("打印用户信息")]
+    private async Task LogUserInfo(BiliCookie ck)
+    {
+        await accountDomainService.LoginByCookie(ck);
+    }
+
+    [TaskInterceptor("抽奖")]
+    private async Task LotteryTianXuan(BiliCookie ck)
+    {
+        await liveDomainService.TianXuan(ck);
+    }
+
+    [TaskInterceptor("自动分组关注的主播")]
+    private async Task AutoGroupFollowings(BiliCookie ck)
+    {
+        if (_liveLotteryTaskOptions.AutoGroupFollowings)
+        {
+            await liveDomainService.GroupFollowing(ck);
+        }
+        else
+        {
+            logger.LogInformation("配置未开启，跳过");
         }
     }
 }

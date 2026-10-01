@@ -1,25 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Ray.BiliBiliTool.Agent;
 using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos;
+using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos.ApiApi.Charge;
+using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos.NavApi;
 
-namespace Ray.BiliBiliTool.DomainService.Interfaces
+namespace Ray.BiliBiliTool.DomainService.Interfaces;
+
+/// <summary>
+/// 充电
+/// </summary>
+public interface IChargeDomainService : IDomainService
 {
     /// <summary>
     /// 充电
     /// </summary>
-    public interface IChargeDomainService : IDomainService
-    {
-        /// <summary>
-        /// 充电
-        /// </summary>
-        /// <param name="userInfo"></param>
-        void Charge(UserInfo userInfo);
+    /// <param name="userInfo"></param>
+    Task Charge(UserInfo userInfo, BiliCookie ck);
 
-        /// <summary>
-        /// 充电后留言
-        /// </summary>
-        /// <param name="token"></param>
-        void ChargeComments(string token);
-    }
+    /// <summary>
+    /// 充电后留言
+    /// </summary>
+    /// <param name="token"></param>
+    Task ChargeComments(string token, BiliCookie ck);
 }

@@ -1,24 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Ray.BiliBiliTool.Agent;
 
-namespace Ray.BiliBiliTool.DomainService.Interfaces
+namespace Ray.BiliBiliTool.DomainService.Interfaces;
+
+/// <summary>
+/// B币
+/// </summary>
+public interface ICoinDomainService : IDomainService
 {
     /// <summary>
-    /// B币
+    /// 获取账户硬币余额
     /// </summary>
-    public interface ICoinDomainService : IDomainService
-    {
-        /// <summary>
-        /// 获取账户硬币余额
-        /// </summary>
-        /// <returns></returns>
-        decimal GetCoinBalance();
+    /// <returns></returns>
+    Task<decimal> GetCoinBalance(BiliCookie ck);
 
-        /// <summary>
-        /// 获取今日已投币数量
-        /// </summary>
-        /// <returns></returns>
-        int GetDonatedCoins();
-    }
+    /// <summary>
+    /// 获取今日已投币数量
+    /// </summary>
+    /// <returns></returns>
+    Task<int> GetDonatedCoins(BiliCookie ck);
 }

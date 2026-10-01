@@ -1,33 +1,45 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos.Live;
+﻿using Ray.BiliBiliTool.Agent;
+using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos.LiveApi;
 
-namespace Ray.BiliBiliTool.DomainService.Interfaces
+namespace Ray.BiliBiliTool.DomainService.Interfaces;
+
+/// <summary>
+/// 直播中心
+/// </summary>
+public interface ILiveDomainService : IDomainService
 {
     /// <summary>
-    /// 直播中心
+    /// 签到
     /// </summary>
-    public interface ILiveDomainService : IDomainService
-    {
-        /// <summary>
-        /// 签到
-        /// </summary>
-        void LiveSign();
+    Task LiveSign(BiliCookie ck);
 
-        /// <summary>
-        /// 银瓜子兑换硬币
-        /// </summary>
-        /// <returns></returns>
-        bool ExchangeSilver2Coin();
+    /// <summary>
+    /// 银瓜子兑换硬币
+    /// </summary>
+    /// <returns></returns>
+    Task<bool> ExchangeSilver2Coin(BiliCookie ck);
 
-        /// <summary>
-        /// 天选抽奖
-        /// </summary>
-        void TianXuan();
+    /// <summary>
+    /// 天选抽奖
+    /// </summary>
+    Task TianXuan(BiliCookie ck);
 
-        void TryJoinTianXuan(ListItemDto target);
+    Task TryJoinTianXuan(ListItemDto target, BiliCookie ck);
 
-        void GroupFollowing();
-    }
+    Task GroupFollowing(BiliCookie ck);
+
+    /// <summary>
+    /// 发送弹幕
+    /// </summary>
+    Task SendDanmakuToFansMedalLive(BiliCookie ck);
+
+    /// <summary>
+    /// 直播时长挂机
+    /// </summary>
+    Task SendHeartBeatToFansMedalLive(BiliCookie ck);
+
+    /// <summary>
+    /// 点赞直播间
+    /// </summary>
+    Task LikeFansMedalLive(BiliCookie ck);
 }

@@ -1,18 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Ray.BiliBiliTool.Agent;
+using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos;
+using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos.ApiApi.Video;
 
-namespace Ray.BiliBiliTool.DomainService.Interfaces
+namespace Ray.BiliBiliTool.DomainService.Interfaces;
+
+/// <summary>
+/// 投币
+/// </summary>
+public interface IDonateCoinDomainService : IDomainService
 {
-    /// <summary>
-    /// 投币
-    /// </summary>
-    public interface IDonateCoinDomainService : IDomainService
-    {
-        void AddCoinsForVideos();
+    Task AddCoinsForVideos(BiliCookie ck);
 
-        Tuple<string, string> TryGetCanDonatedVideo();
+    Task<UpVideoInfo?> TryGetCanDonatedVideo(BiliCookie ck);
 
-        bool DoAddCoinForVideo(string aid, int multiply, bool select_like, string title = "");
-    }
+    Task<bool> DoAddCoinForVideo(UpVideoInfo video, bool select_like, BiliCookie ck);
 }

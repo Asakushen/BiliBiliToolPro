@@ -1,109 +1,121 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Ray.BiliBiliTool.Config;
-using Ray.BiliBiliTool.Config.Options;
-using Ray.BiliBiliTool.Infrastructure;
+﻿using System.ComponentModel;
+using Ray.BiliBiliTool.Domain.Exceptions;
+using Ray.BiliBiliTool.Infrastructure.Cookie;
+using Ray.BiliBiliTool.Infrastructure.Extensions;
 
-namespace Ray.BiliBiliTool.Agent
+namespace Ray.BiliBiliTool.Agent;
+
+public class BiliCookie(Dictionary<string, string> cookieDic) : CookieInfo(cookieDic)
 {
-    public class BiliCookie : CookieInfo
+    protected override string CkValueBuild(string value)
     {
-        private readonly ILogger<BiliCookie> _logger;
+        value = base.CkValueBuild(value);
 
-        public BiliCookie(ILogger<BiliCookie> logger,
-            CookieStrFactory cookieStrFactory)
-            : base(cookieStrFactory.GetCurrentCookieStr())
+        if (value.Contains(','))
         {
-            _logger = logger;
-
-            if (CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(UserId)), out string userId))
-            {
-                UserId = userId;
-            }
-            if (CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(BiliJct)), out string jct))
-            {
-                BiliJct = jct;
-            }
-            if (CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(SessData)), out string sess))
-            {
-                SessData = sess;
-            }
-
-            this.Check();
+            value = Uri.EscapeDataString(value);
         }
 
-        [Description("DedeUserID")]
-        public string UserId { get; set; }
+        return value;
+    }
 
-        /// <summary>
-        /// SESSDATA
-        /// </summary>
-        [Description("SESSDATA")]
-        public string SessData { get; set; }
+    #region 扩充属性
 
-        [Description("bili_jct")]
-        public string BiliJct { get; set; }
+    [Description("DedeUserID")]
+    public string UserId =>
+        CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(UserId)), out string? userId)
+            ? userId
+            : "";
 
-        /// <summary>
-        /// 检查是否已配置
-        /// </summary>
-        /// <returns></returns>
-        public override void Check()
+    /// <summary>
+    /// SESSDATA
+    /// </summary>
+    [Description("SESSDATA")]
+    public string SessData =>
+        CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(SessData)), out string? sess)
+            ? sess
+            : "";
+
+    [Description("bili_jct")]
+    public string BiliJct =>
+        CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(BiliJct)), out string? jct)
+            ? jct
+            : "";
+
+    [Description("LIVE_BUVID")]
+    public string LiveBuvid =>
+        CookieItemDictionary.TryGetValue(
+            GetPropertyDescription(nameof(LiveBuvid)),
+            out string? liveBuvid
+        )
+            ? liveBuvid
+            : "";
+
+    [Description("buvid3")]
+    public string Buvid =>
+        CookieItemDictionary.TryGetValue(GetPropertyDescription(nameof(Buvid)), out string? buvid)
+            ? buvid
+            : "";
+
+    #endregion
+
+
+    /// <summary>
+    /// 检查是否已配置
+    /// </summary>
+    /// <returns></returns>
+    public override void Check()
+    {
+        base.Check();
+
+        if (CookieItemDictionary.Count == 0)
+            throw new BiliValidationException("Cookie字符串格式异常，内部无等号");
+
+        bool result = true;
+        string msg = "Cookie字符串异常，无[{0}]项";
+
+        //UserId为空，抛异常
+        if (string.IsNullOrWhiteSpace(UserId))
         {
-            base.Check();
-
-            if (CookieItemDictionary.Count == 0) throw new Exception("Cookie字符串格式异常，内部无等号");
-
-            bool result = true;
-            string msg = "Cookie字符串异常，无[{1}]项";
-
-            //UserId为空，抛异常
-            if (string.IsNullOrWhiteSpace(UserId))
-            {
-                _logger.LogWarning(msg, GetPropertyDescription(nameof(UserId)));
-
-                result = false;
-            }
-            else if (!long.TryParse(UserId, out long uid))//不为空，但不能转换为long，警告
-            {
-                _logger.LogWarning("[{uidKey}]={uid} 不能转换为long型，请确认配置的是正确的Cookie值", GetPropertyDescription(nameof(UserId)), UserId);
-            }
-
-            //SessData为空，抛异常
-            if (string.IsNullOrWhiteSpace(SessData))
-            {
-                _logger.LogWarning(msg, GetPropertyDescription(nameof(SessData)));
-                result = false;
-            }
-
-            //BiliJct为空，抛异常
-            if (string.IsNullOrWhiteSpace(BiliJct))
-            {
-                _logger.LogWarning(msg, GetPropertyDescription(nameof(BiliJct)));
-                result = false;
-            }
-
-            if (!result)
-                throw new Exception($"请正确配置Cookie后再运行，配置方式见 {Constants.SourceCodeUrl}");
+            throw new BiliValidationException(
+                string.Format(msg, GetPropertyDescription(nameof(UserId)))
+            );
+        }
+        else if (!long.TryParse(UserId, out long uid)) //不为空，但不能转换为long，警告
+        {
+            throw new BiliValidationException(
+                string.Format(
+                    "[{0}]={1} 不能转换为long型，请确认配置的是正确的Cookie值",
+                    GetPropertyDescription(nameof(UserId)),
+                    UserId
+                )
+            );
         }
 
-        public override string ToString()
+        //SessData为空，抛异常
+        if (string.IsNullOrWhiteSpace(SessData))
         {
-            if (CookieStr.IsNotNullOrEmpty()) return CookieStr;
-
-            return "";
+            throw new BiliValidationException(
+                string.Format(msg, GetPropertyDescription(nameof(SessData)))
+            );
         }
 
-        private string GetPropertyDescription(string propertyName)
+        //BiliJct为空，抛异常
+        if (string.IsNullOrWhiteSpace(BiliJct))
         {
-            return GetType().GetPropertyDescription(propertyName);
+            throw new BiliValidationException(
+                string.Format(msg, GetPropertyDescription(nameof(BiliJct)))
+            );
         }
+
+        if (!result)
+            throw new BiliValidationException(
+                $"请正确配置Cookie后再运行，配置方式见 {Config.Constants.SourceCodeUrl}"
+            );
+    }
+
+    private string GetPropertyDescription(string propertyName)
+    {
+        return GetType().GetPropertyDescription(propertyName);
     }
 }

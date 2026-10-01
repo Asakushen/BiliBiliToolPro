@@ -1,37 +1,68 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Ray.BiliBiliTool.Infrastructure.Extensions;
 
-namespace Ray.BiliBiliTool.Infrastructure
+namespace Ray.BiliBiliTool.Infrastructure.Cookie;
+
+public class CookieStrFactory<TCookieInfo>(IConfiguration configuration)
+    where TCookieInfo : CookieInfo
 {
-    public class CookieStrFactory
+    private Dictionary<int, Dictionary<string, string>> CookieDictionary => GetCookieDictionary();
+
+    public int Count => CookieDictionary.Count;
+
+    public TCookieInfo GetCookie(int index)
     {
-        private List<string> _strList = new List<string>();
-
-        public CookieStrFactory(List<string> strList)
-        {
-            _strList = strList;
-        }
-
-        public int CurrentNum { get; set; } = 1;
-        private int _index => CurrentNum - 1;
-
-        public int Count => _strList.Count;
-
-        public bool Any()
-        {
-            if (CurrentNum <= Count) return true;
-            else return false;
-        }
-
-        public string GetCurrentCookieStr()
-        {
-            if (!Any()) throw new Exception($"第 {CurrentNum} 个cookie字符串不存在");
-
-            return _strList[_index];
-        }
+        var dic = GetCookieDictionary()[index];
+        return (TCookieInfo)Activator.CreateInstance(typeof(TCookieInfo), dic)!
+            ?? throw new InvalidOperationException();
     }
+
+    public static TCookieInfo CreateNew(string cookie)
+    {
+        Dictionary<string, string> dic = CkStrToDictionary(cookie);
+        return (TCookieInfo)Activator.CreateInstance(typeof(TCookieInfo), dic)!
+            ?? throw new InvalidOperationException();
+    }
+
+    #region private
+
+    private Dictionary<int, Dictionary<string, string>> GetCookieDictionary()
+    {
+        var list = configuration.GetSection("BiliBiliCookies").Get<List<string>>() ?? [];
+        return CookeStrListToCookieDic(list);
+    }
+
+    private Dictionary<int, Dictionary<string, string>> CookeStrListToCookieDic(List<string> ckList)
+    {
+        var dic = new Dictionary<int, Dictionary<string, string>>();
+        ckList ??= [];
+
+        for (int i = 0; i < ckList?.Count; i++)
+        {
+            dic.Add(i, CkStrToDictionary(ckList[i]));
+        }
+
+        return dic;
+    }
+
+    private static Dictionary<string, string> CkStrToDictionary(string ckStr)
+    {
+        var dic = new Dictionary<string, string>();
+        var ckItemList = ckStr.Split(";", StringSplitOptions.TrimEntries).Distinct();
+        foreach (var item in ckItemList)
+        {
+            var key = item[..item.IndexOf("=", StringComparison.Ordinal)].Trim();
+            var value = item[(item.IndexOf("=", StringComparison.Ordinal) + 1)..].Trim();
+            dic.AddIfNotExist(new KeyValuePair<string, string>(key, value), p => p.Key == key);
+        }
+        return dic;
+    }
+
+    private string DictionaryToCkStr(Dictionary<string, string> dic)
+    {
+        var list = dic.Select(item => $"{item.Key}={item.Value}").ToList();
+        return string.Join("; ", list);
+    }
+
+    #endregion
 }

@@ -1,50 +1,65 @@
-#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-FROM mcr.microsoft.com/dotnet/runtime:6.0 AS base
+# syntax=docker/dockerfile:1
+#See https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/docker/building-net-docker-images
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
+EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+# 编译阶段强制跑在宿主机架构（BUILDPLATFORM）上，不再用 QEMU 模拟 arm64（ADR-0004）：
+# RID-less publish 的产物是架构中立的 IL，全平台的 native 资源会一并进产物
+# （如 runtimes/linux-arm64/native/libe_sqlite3.so），所以在 amd64 上编译出来的
+# 与在 arm64 上编译出来的内容一致，而速度差约 10 倍（arm64 模拟 24.6 min，
+# amd64 原生 2.9 min）。
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /code
-COPY ["src/Ray.BiliBiliTool.Console/Ray.BiliBiliTool.Console.csproj", "src/Ray.BiliBiliTool.Console/"]
-COPY ["src/Ray.BiliBiliTool.DomainService/Ray.BiliBiliTool.DomainService.csproj", "src/Ray.BiliBiliTool.DomainService/"]
-COPY ["src/Ray.BiliBiliTool.Config/Ray.BiliBiliTool.Config.csproj", "src/Ray.BiliBiliTool.Config/"]
-COPY ["src/Ray.BiliBiliTool.Infrastructure/Ray.BiliBiliTool.Infrastructure.csproj", "src/Ray.BiliBiliTool.Infrastructure/"]
-COPY ["src/Ray.BiliBiliTool.Agent/Ray.BiliBiliTool.Agent.csproj", "src/Ray.BiliBiliTool.Agent/"]
+
+# 版本一律由 CI 显式注入（构建时烘焙，ADR-0002）：
+# VERSION 是完整版本号（alpha 的 x.y.z-alpha.N 或稳定版 x.y.z）；
+# 本地手动 docker build 不传时，产物为 common.props 的 0.0.0-dev 兜底。
+ARG VERSION=""
+
+COPY ["Directory.Packages.props", "./"]
+COPY ["src/Ray.BiliBiliTool.Web/Ray.BiliBiliTool.Web.csproj", "src/Ray.BiliBiliTool.Web/"]
+COPY ["src/Ray.BiliBiliTool.Web.Client/Ray.BiliBiliTool.Web.Client.csproj", "src/Ray.BiliBiliTool.Web.Client/"]
 COPY ["src/Ray.BiliBiliTool.Application/Ray.BiliBiliTool.Application.csproj", "src/Ray.BiliBiliTool.Application/"]
 COPY ["src/Ray.BiliBiliTool.Application.Contracts/Ray.BiliBiliTool.Application.Contracts.csproj", "src/Ray.BiliBiliTool.Application.Contracts/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.CoolPushBatched/Ray.Serilog.Sinks.CoolPushBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.CoolPushBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.Batched/Ray.Serilog.Sinks.Batched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.Batched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.TelegramBatched/Ray.Serilog.Sinks.TelegramBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.TelegramBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.WorkWeiXinBatched/Ray.Serilog.Sinks.WorkWeiXinBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.WorkWeiXinBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.OtherApiBatched/Ray.Serilog.Sinks.OtherApiBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.OtherApiBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.DingTalkBatched/Ray.Serilog.Sinks.DingTalkBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.DingTalkBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.PushPlusBatched/Ray.Serilog.Sinks.PushPlusBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.PushPlusBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.ServerChanBatched/Ray.Serilog.Sinks.ServerChanBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.ServerChanBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.MicrosoftTeamsBatched/Ray.Serilog.Sinks.MicrosoftTeamsBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.MicrosoftTeamsBatched/"]
-COPY ["src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.WorkWeiXinAppBatched/Ray.Serilog.Sinks.WorkWeiXinAppBatched.csproj", "src/Ray.Serilog.Sinks/Ray.Serilog.Sinks.WorkWeiXinAppBatched/"]
-RUN dotnet restore "src/Ray.BiliBiliTool.Console/Ray.BiliBiliTool.Console.csproj"
-COPY . .
-WORKDIR "/code/src/Ray.BiliBiliTool.Console"
-RUN dotnet build "Ray.BiliBiliTool.Console.csproj" -c Release -o /app/build
+COPY ["src/Ray.BiliBiliTool.Domain/Ray.BiliBiliTool.Domain.csproj", "src/Ray.BiliBiliTool.Domain/"]
+COPY ["src/Ray.BiliBiliTool.DomainService/Ray.BiliBiliTool.DomainService.csproj", "src/Ray.BiliBiliTool.DomainService/"]
+COPY ["src/Ray.BiliBiliTool.Config/Ray.BiliBiliTool.Config.csproj", "src/Ray.BiliBiliTool.Config/"]
+COPY ["src/Ray.BiliBiliTool.Agent/Ray.BiliBiliTool.Agent.csproj", "src/Ray.BiliBiliTool.Agent/"]
+COPY ["src/Ray.BiliBiliTool.Infrastructure/Ray.BiliBiliTool.Infrastructure.csproj", "src/Ray.BiliBiliTool.Infrastructure/"]
+COPY ["src/Ray.BiliBiliTool.Infrastructure.EF/Ray.BiliBiliTool.Infrastructure.EF.csproj", "src/Ray.BiliBiliTool.Infrastructure.EF/"]
+COPY ["src/BlazingQuartz.Core/BlazingQuartz.Core.csproj", "src/BlazingQuartz.Core/"]
+COPY ["src/BlazingQuartz.Jobs/BlazingQuartz.Jobs.csproj", "src/BlazingQuartz.Jobs/"]
+COPY ["src/BlazingQuartz.Jobs.Abstractions/BlazingQuartz.Jobs.Abstractions.csproj", "src/BlazingQuartz.Jobs.Abstractions/"]
 
-FROM build AS publish
-RUN dotnet publish "Ray.BiliBiliTool.Console.csproj" -c Release -o /app/publish
+RUN dotnet restore "src/Ray.BiliBiliTool.Web/Ray.BiliBiliTool.Web.csproj"
+
+COPY . .
+
+# chmod 特意放在编译阶段（宿主机架构）做，好让 final 层一条 RUN 都不剩：
+# 这样全程不执行任何目标架构指令，连 setup-qemu-action 都不必装。
+RUN chmod +x platforms/docker/entrypoint.sh
+
+WORKDIR "/code/src/Ray.BiliBiliTool.Web"
+
+# 只 publish、不 build：原先 `dotnet build -o /app/build` 与 `dotnet publish -o /app/publish`
+# 输出目录不同，会让增量判断失效、整套方案重编两遍（arm64 上白扔约 8 分钟）。
+# --no-restore：assets 已由上面的 restore 层生成，publish 不必再还原一遍。
+# UseAppHost=false：入口是 `dotnet Ray.BiliBiliTool.Web.dll`，用不到 apphost。
+# 最后一步是冒烟断言：--no-restore 复用的是一个「还没有 .razor 文件时」做出的
+# 还原结果，`_framework/blazor.web.js` 曾经因此被静默漏掉，页面能开但每个按钮
+# 都点不动（见 ADR-0008）。产物里没有这个脚本就直接让构建失败。
+RUN version_arg="" \
+    && if [ -n "$VERSION" ]; then version_arg="-p:Version=$VERSION"; fi \
+    && dotnet publish "Ray.BiliBiliTool.Web.csproj" -c Release -o /app/publish --no-restore -p:UseAppHost=false $version_arg \
+    && if [ ! -f /app/publish/wwwroot/_framework/blazor.web.js ]; then \
+       echo "ERROR: _framework/blazor.web.js missing from the publish output (see ADR-0008)"; exit 1; \
+       fi
 
 FROM base AS final
+ARG VERSION=""
+LABEL org.opencontainers.image.version="${VERSION}"
 WORKDIR /app
-ENV TIME_ZONE=Asia/Shanghai
-COPY --from=publish /app/publish .
-COPY ./docker/entry.sh ./docker/crontab /app/
-RUN ln -fs /usr/share/zoneinfo/$TIME_ZONE /etc/localtime \
-    && echo $TIME_ZONE > /etc/timezone \
-    && cp /etc/apt/sources.list /etc/apt/sources.list.bak \
-	&& sed -i 's/deb.debian.org/mirrors.163.com/g' /etc/apt/sources.list \
-	&& sed -i 's/security.debian.org/mirrors.163.com/g' /etc/apt/sources.list \
-	&& apt-get clean \ 
-    && apt-get update \
-    && apt-get install -y cron tzdata tofrodos \
-    && apt-get clean \ 
-    && fromdos /app/entry.sh \
-    && chmod +x /app/entry.sh \
-    && fromdos /app/crontab
-ENTRYPOINT ["/bin/bash", "-c", "/app/entry.sh"]
+COPY --from=build /app/publish .
+COPY --from=build /code/platforms/docker/entrypoint.sh /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]

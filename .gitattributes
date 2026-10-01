@@ -1,0 +1,17 @@
+# 文本文件：仓库内存 LF，检出到工作区也写 LF。
+# eol=lf 优先于每个人本机的 core.autocrlf，因此不需要再按扩展名逐个声明。
+* text=auto eol=lf
+
+# Windows 批处理必须是 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制：不做换行转换，也不参与 diff/merge
+*.dll binary
+*.exe binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

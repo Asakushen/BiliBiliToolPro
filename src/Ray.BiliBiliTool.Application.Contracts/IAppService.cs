@@ -1,14 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿namespace Ray.BiliBiliTool.Application.Contracts;
 
-namespace Ray.BiliBiliTool.Application.Contracts
+public interface IAppService
 {
-    /// <summary>
-    /// 定义一个AppService
-    /// </summary>
-    public interface IAppService
-    {
-        void DoTask();
-    }
+    Task DoTaskAsync(CancellationToken cancellationToken = default);
 }
